@@ -1,0 +1,43 @@
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports.biome": "explicit",
+    "source.fixAll.biome": "explicit",
+    "source.removeUnusedImports": "explicit"
+  },
+  "editor.fontFamily": "'MonaspaceNeonVar-SemiWideRegular', monospace",
+  "editor.tabSize": 2,
+  "catppuccin-noctis-icons.hidesExplorerArrows": false,
+  "catppuccin-noctis-icons.files.associations": {
+    "*.module.ts": "nest",
+    "*.service.ts": "nest-service",
+    "*.provider.ts": "nest-service",
+    "*.controller.ts": "nest-controller",
+    "*.interface.ts": "rescript-interface",
+    "*.decorator.ts": "nest",
+    "*.middleware.ts": "nest-middleware",
+    "*.guard.ts": "nest",
+    "*.test.ts": "jest",
+    "*.spec.ts": "jest",
+    "*.dto.ts": "dts",
+    "main.ts": "rome"
+  },
+  "catppuccin-noctis-icons.folders.associations": {
+    "services": "folder-Services",
+    "features": "folder-orange-outline",
+    "interfaces": "folder-interfaces",
+    "modules": "folder-modules",
+    "common": "folder-shared",
+    "utils": "folder-utils",
+    "test": "folder-utils",
+    "constants": "folder-shared",
+    "pipes": "folder-pipes",
+    "interceptors": "folder-interceptors",
+    "guards": "folder-guards",
+    "decorators": "folder-decorators",
+    "filters": "folder-filters",
+    "middlewares": "folder-middlewares",
+    "resolvers": "folder-resolvers"
+  },
+  "prisma.pinToPrisma6": true
+}

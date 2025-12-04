@@ -1,0 +1,30 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Item {
+  id          Int      @id // 使用源数据的ID
+  name        String
+  category    String // secondClassCN
+  latestPrice Int
+  updatedAt   DateTime @updatedAt
+
+  prices PriceRecord[]
+}
+
+model PriceRecord {
+  id         Int      @id @default(autoincrement())
+  item       Item     @relation(fields: [itemId], references: [id])
+  itemId     Int
+  price      Int
+  recordedAt DateTime // is_get_time (秒级时间戳转换而来)
+
+  @@index([itemId])
+  @@index([recordedAt])
+}
