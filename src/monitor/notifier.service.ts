@@ -64,7 +64,7 @@ export class NotifierService {
 
     if (topHighVol.length > 0) {
       // 触发老板关注模式
-      md += `\n⚠️ <font color="warning">**老板，一定要关注下！**</font> **@郭子淳**\n`;
+      md += `\n⚠️ <font color="warning">**老板，一定要关注下！**</font> **@${process.env.BOSS_NAME}**\n`;
       md += `> 发现 **${highVolatilityItems.length}** 个物品波动剧烈 (展示 Top 10)：\n\n`;
 
       topHighVol.forEach((item) => {
