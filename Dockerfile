@@ -88,4 +88,4 @@ EXPOSE 3002
 USER nestjs
 
 # 使用 node 直接启动，避免在最终镜像安装 pnpm
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "dist/main.js"]
