@@ -14,8 +14,7 @@ interface DeltaItem {
 @Injectable()
 export class FetcherService {
   private readonly logger = new Logger(FetcherService.name);
-  private readonly DATA_URL =
-    'https://raw.githubusercontent.com/orzice/DeltaForcePrice/master/price.json';
+  private readonly DATA_URL = process.env.PRICE_DATA_URL;
 
   constructor(
     private readonly httpService: HttpService,
