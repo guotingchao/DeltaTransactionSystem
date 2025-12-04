@@ -52,9 +52,9 @@ COPY --from=deps /app/node_modules ./node_modules
 # 仅保留生产依赖，已生成的 Prisma Client 会被保留
 RUN pnpm prune --prod
 
-    # 为生产依赖生成 Prisma Client（不将 CLI 带入最终镜像）
-    COPY prisma ./prisma
-    RUN pnpm dlx prisma@6.17.0 generate
+# 为生产依赖生成 Prisma Client（不将 CLI 带入最终镜像）
+COPY prisma ./prisma
+RUN pnpm dlx prisma@6.17.0 generate
 
 
 # 最终运行镜像（最小化体积，无全局 pnpm、无 dev 依赖、无 .env）
