@@ -35,7 +35,7 @@ export class FetcherService {
 
       // 步骤2：预加载现有数据到内存（单次查询）
       const existingItems = await this.prisma.item.findMany({
-        select: { id: true, latestPrice: true },
+        select: { id: true, latestPrice: true, name: true },
       });
       const existingItemMap = new Map(existingItems.map((item) => [item.id, item]));
 
@@ -67,12 +67,15 @@ export class FetcherService {
             latestPrice: item.price,
           });
         } else {
-          // 更新现有物品
-          itemsToUpdate.push({
-            id: item.id,
-            name: item.name,
-            latestPrice: item.price,
-          });
+          // 仅当价格或名称发生变化时才更新物品信息
+          // 这将极大减少数据库写入操作，解决超时问题
+          if (existingItem.latestPrice !== item.price || existingItem.name !== item.name) {
+            itemsToUpdate.push({
+              id: item.id,
+              name: item.name,
+              latestPrice: item.price,
+            });
+          }
         }
 
         // 检查是否需要创建新的价格记录
@@ -86,49 +89,42 @@ export class FetcherService {
         }
       }
 
-      // 步骤4：使用事务批量执行数据库操作
-      // 设置超时时间为 20 秒 (默认是 5 秒)
-      await this.prisma.$transaction(
-        async (tx) => {
-          // 批量创建新物品
-          if (newItems.length > 0) {
-            await tx.item.createMany({
-              data: newItems,
-              skipDuplicates: true,
-            });
-          }
+      // 步骤4：批量执行数据库操作 (移除全局事务以避免超时)
 
-          // 批量更新现有物品 (分批处理以避免超时和数据库压力)
-          if (itemsToUpdate.length > 0) {
-            const BATCH_SIZE = 50;
-            for (let i = 0; i < itemsToUpdate.length; i += BATCH_SIZE) {
-              const chunk = itemsToUpdate.slice(i, i + BATCH_SIZE);
-              const updatePromises = chunk.map((item) =>
-                tx.item.update({
-                  where: { id: item.id },
-                  data: {
-                    name: item.name,
-                    latestPrice: item.latestPrice,
-                    updatedAt: new Date(),
-                  },
-                }),
-              );
-              await Promise.all(updatePromises);
-            }
-          }
+      // 4.1 批量创建新物品
+      if (newItems.length > 0) {
+        await this.prisma.item.createMany({
+          data: newItems,
+          skipDuplicates: true,
+        });
+      }
 
-          // 批量创建价格记录
-          if (newPriceRecords.length > 0) {
-            await tx.priceRecord.createMany({
-              data: newPriceRecords,
-              skipDuplicates: true,
-            });
-          }
-        },
-        {
-          timeout: 20000, // 增加超时时间到 20000ms
-        },
-      );
+      // 4.2 批量更新现有物品 (仅更新有变化的数据)
+      if (itemsToUpdate.length > 0) {
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < itemsToUpdate.length; i += BATCH_SIZE) {
+          const chunk = itemsToUpdate.slice(i, i + BATCH_SIZE);
+          const updatePromises = chunk.map((item) =>
+            this.prisma.item.update({
+              where: { id: item.id },
+              data: {
+                name: item.name,
+                latestPrice: item.latestPrice,
+                updatedAt: new Date(),
+              },
+            }),
+          );
+          await Promise.all(updatePromises);
+        }
+      }
+
+      // 4.3 批量创建价格记录
+      if (newPriceRecords.length > 0) {
+        await this.prisma.priceRecord.createMany({
+          data: newPriceRecords,
+          skipDuplicates: true,
+        });
+      }
 
       this.logger.log(
         `Sync complete. ` +
