@@ -16,7 +16,9 @@ export class NotifierService {
     COLLECTION: ['收集品'],
   };
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(private readonly httpService: HttpService) {
+    this.logger.log('NotifierService initialized v2.0 (Debug Enabled)');
+  }
 
   async sendReport(analysis: MarketAnalysis) {
     if (!this.WEBHOOK_URL) {
@@ -27,7 +29,9 @@ export class NotifierService {
     const markdown = this.generateMarkdown(analysis);
 
     try {
-      await firstValueFrom(
+      this.logger.log(`Generated markdown length: ${markdown.length}`);
+
+      const response = await firstValueFrom(
         this.httpService.post(this.WEBHOOK_URL, {
           msgtype: 'markdown',
           markdown: {
@@ -35,7 +39,18 @@ export class NotifierService {
           },
         }),
       );
-      this.logger.log('Market report sent successfully.');
+
+      // 检查业务层面的错误 (针对企业微信/飞书等通常返回 200 但带有 errcode 的情况)
+      const responseData = response.data;
+      if (responseData && responseData.errcode && responseData.errcode !== 0) {
+        this.logger.error(
+          `Webhook returned error: ${JSON.stringify(responseData)}. Markdown length: ${markdown.length}`,
+        );
+      } else {
+        this.logger.log(
+          `Market report sent successfully. Response: ${JSON.stringify(responseData)}`,
+        );
+      }
     } catch (error) {
       this.logger.error('Failed to send market report', error);
     }

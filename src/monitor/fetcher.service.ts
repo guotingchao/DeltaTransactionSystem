@@ -22,6 +22,7 @@ export class FetcherService {
   ) {}
 
   async fetchAndSyncData() {
+    this.logger.log('Starting fetchAndSyncData v2.0 (Smart Update)');
     this.logger.log('Starting data fetch...');
     try {
       // 步骤1：获取远程数据

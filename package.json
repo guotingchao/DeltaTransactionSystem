@@ -11,7 +11,7 @@
     "start": "nest start",
     "prisma:generate": "node_modules/.bin/prisma generate ",
     "prisma:push": "node_modules/.bin/prisma db push",
-    "start:dev": "nest start --watch",
+    "start:dev": "rm -rf dist && nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
