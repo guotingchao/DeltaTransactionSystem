@@ -87,38 +87,48 @@ export class FetcherService {
       }
 
       // 步骤4：使用事务批量执行数据库操作
-      await this.prisma.$transaction(async (tx) => {
-        // 批量创建新物品
-        if (newItems.length > 0) {
-          await tx.item.createMany({
-            data: newItems,
-            skipDuplicates: true,
-          });
-        }
+      // 设置超时时间为 20 秒 (默认是 5 秒)
+      await this.prisma.$transaction(
+        async (tx) => {
+          // 批量创建新物品
+          if (newItems.length > 0) {
+            await tx.item.createMany({
+              data: newItems,
+              skipDuplicates: true,
+            });
+          }
 
-        // 批量更新现有物品
-        if (itemsToUpdate.length > 0) {
-          const updatePromises = itemsToUpdate.map((item) =>
-            tx.item.update({
-              where: { id: item.id },
-              data: {
-                name: item.name,
-                latestPrice: item.latestPrice,
-                updatedAt: new Date(),
-              },
-            }),
-          );
-          await Promise.all(updatePromises);
-        }
+          // 批量更新现有物品 (分批处理以避免超时和数据库压力)
+          if (itemsToUpdate.length > 0) {
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < itemsToUpdate.length; i += BATCH_SIZE) {
+              const chunk = itemsToUpdate.slice(i, i + BATCH_SIZE);
+              const updatePromises = chunk.map((item) =>
+                tx.item.update({
+                  where: { id: item.id },
+                  data: {
+                    name: item.name,
+                    latestPrice: item.latestPrice,
+                    updatedAt: new Date(),
+                  },
+                }),
+              );
+              await Promise.all(updatePromises);
+            }
+          }
 
-        // 批量创建价格记录
-        if (newPriceRecords.length > 0) {
-          await tx.priceRecord.createMany({
-            data: newPriceRecords,
-            skipDuplicates: true,
-          });
-        }
-      });
+          // 批量创建价格记录
+          if (newPriceRecords.length > 0) {
+            await tx.priceRecord.createMany({
+              data: newPriceRecords,
+              skipDuplicates: true,
+            });
+          }
+        },
+        {
+          timeout: 20000, // 增加超时时间到 20000ms
+        },
+      );
 
       this.logger.log(
         `Sync complete. ` +
