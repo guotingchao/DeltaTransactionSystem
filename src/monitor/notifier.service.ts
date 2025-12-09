@@ -26,93 +26,102 @@ export class NotifierService {
       return;
     }
 
-    const markdown = this.generateMarkdown(analysis);
+    // 生成多条消息，避免超出字节限制
+    const messages = this.generateMarkdownMessages(analysis);
 
-    try {
-      this.logger.log(`Generated markdown length: ${markdown.length}`);
-
-      const response = await firstValueFrom(
-        this.httpService.post(this.WEBHOOK_URL, {
-          msgtype: 'markdown',
-          markdown: {
-            content: markdown,
-          },
-        }),
-      );
-
-      // 检查业务层面的错误 (针对企业微信/飞书等通常返回 200 但带有 errcode 的情况)
-      const responseData = response.data;
-      if (responseData && responseData.errcode && responseData.errcode !== 0) {
-        this.logger.error(
-          `Webhook returned error: ${JSON.stringify(responseData)}. Markdown length: ${markdown.length}`,
-        );
-      } else {
+    for (const [index, markdown] of messages.entries()) {
+      try {
+        const byteLength = Buffer.byteLength(markdown, 'utf8');
         this.logger.log(
-          `Market report sent successfully. Response: ${JSON.stringify(responseData)}`,
+          `Sending part ${index + 1}/${messages.length}. Length: ${markdown.length} chars, ${byteLength} bytes`,
         );
+
+        const response = await firstValueFrom(
+          this.httpService.post(this.WEBHOOK_URL, {
+            msgtype: 'markdown',
+            markdown: {
+              content: markdown,
+            },
+          }),
+        );
+
+        const responseData = response.data;
+        if (responseData && responseData.errcode && responseData.errcode !== 0) {
+          this.logger.error(`Webhook error (Part ${index + 1}): ${JSON.stringify(responseData)}`);
+        } else {
+          this.logger.log(`Part ${index + 1} sent successfully.`);
+        }
+
+        // 简单的延时，避免触发频率限制
+        if (index < messages.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        this.logger.error(`Failed to send report part ${index + 1}`, error);
       }
-    } catch (error) {
-      this.logger.error('Failed to send market report', error);
     }
   }
 
-  private generateMarkdown(analysis: MarketAnalysis): string {
+  private generateMarkdownMessages(analysis: MarketAnalysis): string[] {
+    const messages: string[] = [];
     const time = new Date().toLocaleString('zh-CN', {
       timeZone: 'Asia/Shanghai',
       hour12: false,
     });
 
-    // 1. 基础头部
-    let md = `## 📊 三角洲市场监控日报\n`;
-    md += `<font color="comment">${time}</font>\n`;
-    md += `> 📦 监控物品: **${analysis.totalItems}** 件\n`;
-    md += `--------------------------------\n`;
+    // --- 消息 1: 核心日报头 + 高波动预警 ---
+    let md1 = `## 📊 三角洲市场监控日报\n`;
+    md1 += `<font color="comment">${time}</font>\n`;
+    md1 += `> 📦 监控物品: **${analysis.totalItems}** 件\n`;
+    md1 += `--------------------------------\n`;
 
-    // 2. 核心逻辑：检测高波动 (涨跌幅绝对值 >= 20%)
-    // 使用 allItems 进行全面筛选，不再局限于 Top 5
+    // 高波动检测 (涨跌幅绝对值 >= 20%)
     const highVolatilityItems = analysis.allItems.filter((i) => Math.abs(i.changePercent) >= 20);
-    // 按波动幅度降序排序
     highVolatilityItems.sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
-
-    // 只展示前 10 个高波动物品，防止刷屏
     const topHighVol = highVolatilityItems.slice(0, 10);
 
     if (topHighVol.length > 0) {
-      // 触发老板关注模式
-      md += `\n⚠️ <font color="warning">**老板，一定要关注下！**</font> **@${process.env.BOSS_NAME}**\n`;
-      md += `> 发现 **${highVolatilityItems.length}** 个物品波动剧烈 (展示 Top 10)：\n\n`;
+      md1 += `\n⚠️ <font color="warning">**老板，一定要关注下！**</font> **@${process.env.BOSS_NAME}**\n`;
+      md1 += `> 发现 **${highVolatilityItems.length}** 个物品波动剧烈 (展示 Top 10)：\n\n`;
 
       topHighVol.forEach((item) => {
         const isGain = item.changePercent > 0;
         const icon = isGain ? '🚀' : '💸';
         const color = 'warning';
         const sign = isGain ? '+' : '';
-
-        md += `> ${icon} **${item.name}**\n`;
-        md += `> 现价: ${item.price} | <font color="${color}">**${sign}${item.changePercent}%**</font>\n\n`;
+        md1 += `> ${icon} **${item.name}**\n`;
+        md1 += `> 现价: ${item.price} | <font color="${color}">**${sign}${item.changePercent}%**</font>\n\n`;
       });
-
-      md += `--------------------------------\n`;
+      md1 += `--------------------------------\n`;
     }
+    messages.push(md1);
 
-    // 3. 分类榜单展示
-    md += this.generateCategorySection('🔫 武器配件', this.CATEGORIES.WEAPON, analysis.allItems);
-    md += `--------------------------------\n`;
-    md += this.generateCategorySection('💊 弹药补给', this.CATEGORIES.SUPPLY, analysis.allItems);
-    md += `--------------------------------\n`;
-    md += this.generateCategorySection('🔑 房卡钥匙', this.CATEGORIES.KEY, analysis.allItems);
-    md += `--------------------------------\n`;
-    md += this.generateCategorySection(
+    // --- 消息 2: 武器与弹药榜单 ---
+    let md2 = this.generateCategorySection(
+      '🔫 武器配件',
+      this.CATEGORIES.WEAPON,
+      analysis.allItems,
+    );
+    md2 += this.generateCategorySection('💊 弹药补给', this.CATEGORIES.SUPPLY, analysis.allItems);
+    if (md2.trim()) messages.push(md2);
+
+    // --- 消息 3: 钥匙与藏品榜单 + 底部 ---
+    let md3 = this.generateCategorySection('🔑 房卡钥匙', this.CATEGORIES.KEY, analysis.allItems);
+    md3 += this.generateCategorySection(
       '💎 稀有藏品',
       this.CATEGORIES.COLLECTION,
       analysis.allItems,
     );
-    md += `--------------------------------\n`;
 
-    // 4. 底部
-    md += `\n<font color="comment">数据来源: Gzc三角洲量化交易</font>`;
+    if (md3.trim()) {
+      md3 += `\n<font color="comment">数据来源: Gzc三角洲量化交易</font>`;
+      messages.push(md3);
+    } else if (messages.length > 0) {
+      // 如果没有 md3 内容，把 footer 加到最后一条消息
+      messages[messages.length - 1] += `\n<font color="comment">数据来源: Gzc三角洲量化交易</font>`;
+    }
 
-    return md;
+    return messages;
   }
 
   private generateCategorySection(
