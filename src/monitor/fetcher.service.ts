@@ -40,13 +40,27 @@ export class FetcherService {
       });
       const existingItemMap = new Map(existingItems.map((item) => [item.id, item]));
 
-      // 获取所有item的最新价格记录时间（用于去重）
+      // 获取所有item的最新价格记录（用于去重和价格变化检测）
       const latestRecords = await this.prisma.priceRecord.groupBy({
         by: ['itemId'],
         _max: { recordedAt: true },
       });
       const latestRecordTimeMap = new Map(
         latestRecords.map((record) => [record.itemId, record._max.recordedAt]),
+      );
+
+      // 获取最新价格记录的实际价格值
+      const latestPriceRecords = await this.prisma.priceRecord.findMany({
+        where: {
+          OR: Array.from(latestRecordTimeMap.entries()).map(([itemId, recordedAt]) => ({
+            itemId,
+            recordedAt: recordedAt!,
+          })),
+        },
+        select: { itemId: true, price: true },
+      });
+      const latestPriceMap = new Map(
+        latestPriceRecords.map((record) => [record.itemId, record.price]),
       );
 
       // 步骤3：在内存中分类数据
@@ -79,9 +93,14 @@ export class FetcherService {
           }
         }
 
-        // 检查是否需要创建新的价格记录
+        // 只在价格变化或首次记录时创建新价格记录（优化存储）
         const latestRecordTime = latestRecordTimeMap.get(item.id);
-        if (!latestRecordTime || latestRecordTime.getTime() !== recordTime.getTime()) {
+        const lastPrice = latestPriceMap.get(item.id);
+
+        const isNewTime = !latestRecordTime || latestRecordTime.getTime() !== recordTime.getTime();
+        const isPriceChanged = lastPrice === undefined || lastPrice !== item.price;
+
+        if (isNewTime && isPriceChanged) {
           newPriceRecords.push({
             itemId: item.id,
             price: item.price,
@@ -127,11 +146,13 @@ export class FetcherService {
         });
       }
 
+      const skippedPrices = data.length - newPriceRecords.length;
       this.logger.log(
         `Sync complete. ` +
           `New items: ${newItems.length}, ` +
           `Updated items: ${itemsToUpdate.length}, ` +
-          `New price records: ${newPriceRecords.length}`,
+          `New price records: ${newPriceRecords.length}, ` +
+          `Skipped (unchanged): ${skippedPrices}`,
       );
       return true;
     } catch (error) {

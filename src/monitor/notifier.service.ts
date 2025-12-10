@@ -46,10 +46,13 @@ export class NotifierService {
         );
 
         const responseData = response.data;
+        // 始终打印完整响应，便于调试
+        this.logger.log(`Part ${index + 1} WeCom response: ${JSON.stringify(responseData)}`);
+
         if (responseData && responseData.errcode && responseData.errcode !== 0) {
-          this.logger.error(`Webhook error (Part ${index + 1}): ${JSON.stringify(responseData)}`);
-        } else {
-          this.logger.log(`Part ${index + 1} sent successfully.`);
+          this.logger.error(
+            `⚠️ Webhook returned error code ${responseData.errcode}: ${responseData.errmsg || 'Unknown error'}`,
+          );
         }
 
         // 简单的延时，避免触发频率限制
