@@ -38,6 +38,9 @@ RUN pnpm run prisma:generate
 COPY . .
 RUN pnpm build
 
+# 验证构建产物
+RUN ls -la dist/src/ && test -f dist/src/main.js || (echo "Build failed: main.js not found" && exit 1)
+
 
 # 生产依赖裁剪
 FROM node:22-slim AS prod-deps
@@ -88,4 +91,4 @@ EXPOSE 3002
 USER nestjs
 
 # 使用 node 直接启动，避免在最终镜像安装 pnpm
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

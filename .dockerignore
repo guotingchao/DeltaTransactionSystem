@@ -1,0 +1,59 @@
+# 依赖
+node_modules
+npm-debug.log
+pnpm-lock.yaml
+
+# 构建产物（构建阶段会重新生成）
+dist
+build
+*.tsbuildinfo
+
+# 测试
+coverage
+.nyc_output
+*.spec.ts
+test
+
+# 环境变量（运行时通过环境注入）
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# 文档
+*.md
+README.md
+LICENSE
+
+# 日志
+logs
+*.log
+
+# 临时文件
+tmp
+temp
+*.tmp
+
+# 脚本（测试用）
+scripts/
+trigger-manual-push.ts
+test-webhook.ts
+test-real-format.ts
+diagnose.ts
+
+# Docker 相关
+Dockerfile*
+docker-compose*.yml
+.dockerignore
